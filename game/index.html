@@ -1,19 +1,145 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
+<title>Solmar — Streets of Solmar</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1620;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #fff; }
+  #game-root, #game-root canvas { position: fixed; inset: 0; display: block; }
+  .hud { position: fixed; z-index: 5; pointer-events: none; user-select: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  /* Top-right status cluster */
+  #status { top: 14px; right: 16px; text-align: right; }
+  #stars { font-size: 26px; letter-spacing: 2px; color: #ffd54a; }
+  #stars.hot { color: #ff5252; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  #money { font-size: 26px; font-weight: 800; color: #7ee787; margin-top: 2px; }
+  #health-bar { width: 170px; height: 12px; margin-top: 6px; margin-left: auto;
+    background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.35); border-radius: 6px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: #ff6b6b; transition: width .2s; }
+  #health-fill.low { background: #ff2222; animation: pulse .6s infinite; }
+  /* Minimap */
+  #minimap-wrap { left: 16px; bottom: 16px; }
+  #minimap { width: 180px; height: 180px; border: 2px solid rgba(255,255,255,.5);
+    border-radius: 50%; background: #1d2b1d; box-shadow: 0 2px 12px rgba(0,0,0,.6); }
+  /* Speedometer */
+  #speed-box { right: 18px; bottom: 18px; text-align: right; display: none; }
+  #speed { font-size: 44px; font-weight: 900; line-height: 1; }
+  #speed-box .unit { font-size: 13px; color: #ddd; }
+  /* Objective + hint */
+  #objective { top: 16px; left: 50%; transform: translateX(-50%); font-size: 17px; font-weight: 700;
+    background: rgba(0,0,0,.55); padding: 8px 18px; border-radius: 20px; white-space: nowrap; }
+  #hint { bottom: 18px; left: 50%; transform: translateX(-50%); font-size: 15px; font-weight: 600;
+    background: rgba(0,0,0,.55); padding: 7px 16px; border-radius: 16px; }
+  /* Message feed */
+  #feed { top: 64px; left: 16px; width: 420px; }
+  .feed-line { font-size: 15px; font-weight: 600; background: rgba(0,0,0,.55);
+    padding: 7px 12px; border-radius: 8px; margin-bottom: 6px; border-left: 4px solid #9fb3c8;
+    transition: opacity .8s; }
+  .feed-line.mission { border-left-color: #ffd54a; }
+  .feed-line.success { border-left-color: #2ecc71; }
+  .feed-line.fail { border-left-color: #ff5252; }
+  .feed-line.objective { border-left-color: #4aa3ff; }
+  .feed-line.fade { opacity: 0; }
+  /* Crosshair: two CSS bars, sharper than a text glyph. */
+  #crosshair { top: 50%; left: 50%; width: 22px; height: 22px; transform: translate(-50%,-50%); display: none; }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255,255,255,.9);
+    box-shadow: 0 0 3px rgba(0,0,0,.9); }
+  #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+  #crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+  /* Centre banner */
+  #banner { top: 38%; left: 50%; transform: translate(-50%,-50%); font-size: 52px; font-weight: 900;
+    letter-spacing: 3px; color: #ffd54a; opacity: 0; transition: opacity .3s; white-space: nowrap; }
+  #banner.show { opacity: 1; }
+  /* Damage vignette */
+  #damage-vignette { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,.55) 100%); }
+  #damage-vignette.flash { animation: dmg .5s ease-out; }
+  @keyframes dmg { 0% { opacity: 1; } 100% { opacity: 0; } }
+  /* Overlays */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 24px;
+    background: linear-gradient(180deg, rgba(10,20,35,.55), rgba(10,20,35,.82)); }
+  .title { font-family: Impact, "Arial Black", sans-serif; font-size: 92px; letter-spacing: 6px;
+    color: #ffd54a; text-shadow: 0 4px 0 #c0392b, 0 8px 24px rgba(0,0,0,.6); }
+  .subtitle { font-size: 22px; letter-spacing: 8px; color: #7fd4ff; margin-top: -8px; }
+  .blurb { max-width: 560px; font-size: 16px; line-height: 1.55; color: #e8eef4; margin: 22px 0; }
+  .controls { display: grid; grid-template-columns: auto auto; gap: 4px 18px; font-size: 14px;
+    color: #cfd8e3; text-align: left; margin-bottom: 24px; }
+  .controls b { color: #fff; }
+  button { pointer-events: auto; cursor: pointer; font-size: 20px; font-weight: 800; letter-spacing: 2px;
+    color: #0b1620; background: #ffd54a; border: none; border-radius: 10px; padding: 14px 44px;
+    box-shadow: 0 4px 0 #b89b2e; }
+  button:hover { background: #ffe27a; }
+  button:active { transform: translateY(2px); box-shadow: 0 2px 0 #b89b2e; }
+  button.secondary { background: #2d3a4a; color: #fff; box-shadow: 0 4px 0 #161f2a; margin-top: 10px; }
+  .note { margin-top: 14px; font-size: 13px; color: #9fb3c8; }
+  #end-title { font-family: Impact, "Arial Black", sans-serif; font-size: 84px; letter-spacing: 6px;
+    color: #ff5252; text-shadow: 0 4px 24px rgba(0,0,0,.7); }
+  #end-text { font-size: 18px; margin-top: 12px; color: #e8eef4; }
+  #pause-screen h2 { font-size: 56px; letter-spacing: 4px; margin-bottom: 20px; }
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
-<p id="status" role="status" aria-live="polite"></p>
+<div id="game-root"></div>
+
+<div id="damage-vignette"></div>
+
+<div class="hud" id="status">
+  <div id="stars">☆☆☆☆☆</div>
+  <div id="money">$250</div>
+  <div id="health-bar"><div id="health-fill"></div></div>
+</div>
+
+<div class="hud" id="minimap-wrap"><canvas id="minimap" width="180" height="180"></canvas></div>
+
+<div class="hud" id="speed-box"><div id="speed">0</div><div class="unit">km/h</div></div>
+
+<div class="hud" id="objective" style="display:none"></div>
+<div class="hud" id="hint" style="display:none"></div>
+<div class="hud" id="feed"></div>
+<div class="hud" id="crosshair"></div>
+<div class="hud" id="banner"></div>
+
+<div class="overlay" id="start-screen">
+  <div class="title">SOLMAR</div>
+  <div class="subtitle">STREETS OF SOLMAR</div>
+  <p class="blurb">Teo Reyes is out of lockup and back in Solmar Bay — a sun-soaked coastal
+    city of wide avenues, a marina, and a beach bar that never closes. Fixer Delia Voss has
+    work for a wheelman who can drive, shoot, and lose the heat. Four jobs. One big score.
+    The city is yours.</p>
+  <div class="controls">
+    <span><b>W A S D</b> — move / drive</span><span><b>Mouse</b> — look (click to lock)</span>
+    <span><b>Shift</b> — run</span><span><b>Click</b> — shoot / horn</span>
+    <span><b>Space</b> — jump / handbrake</span><span><b>F</b> — enter / exit car</span>
+    <span><b>E</b> — start mission</span><span><b>P</b> — pause &nbsp; <b>M</b> — mute</span>
+  </div>
+  <button id="play-btn">PLAY</button>
+  <div class="note">Press ENTER to play · Progress saves automatically · An original game — every name, place and asset is invented</div>
+</div>
+
+<div class="overlay" id="pause-screen" style="display:none">
+  <h2>PAUSED</h2>
+  <button id="resume-btn">RESUME</button>
+  <button id="restart-btn" class="secondary">RESTART (CLEAR SAVE)</button>
+  <div class="note">Progress is saved automatically.</div>
+</div>
+
+<div class="overlay" id="end-screen" style="display:none">
+  <div id="end-title">WASTED</div>
+  <div id="end-text"></div>
+</div>
+
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>
