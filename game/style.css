@@ -1,0 +1,370 @@
+/* Solmar HUD and menus. The sky behind the transparent WebGL canvas
+   is a CSS gradient: deep blue overhead, pale haze at the horizon,
+   matching the fog colour in the shader. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: linear-gradient(#3f9edb 0%, #7cc3e8 45%, #bfe3f2 70%, #d8ecf3 100%);
+  font-family: Arial, Helvetica, sans-serif;
+  color: #fff;
+  user-select: none;
+}
+
+#game-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+.hidden { display: none !important; }
+
+#webgl-error {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #16242c;
+  color: #fff;
+  font-size: 18px;
+  padding: 40px;
+  text-align: center;
+  z-index: 100;
+}
+
+/* ---------- HUD ---------- */
+
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+#hud-top-right {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  text-align: right;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+#hud-stars {
+  font-size: 30px;
+  letter-spacing: 4px;
+  color: #ffd23f;
+  line-height: 1.1;
+}
+
+#hud-stars.hot { color: #ff5147; }
+
+#hud-stars.evading { animation: blink 0.7s steps(2, start) infinite; }
+
+@keyframes blink { to { visibility: hidden; } }
+
+@media (prefers-reduced-motion: reduce) {
+  #hud-stars.evading,
+  #hud-banner { animation: none; }
+}
+
+#hud-cash {
+  font-size: 26px;
+  font-weight: bold;
+  color: #7fe0a3;
+}
+
+#hud-objective-card {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  max-width: 340px;
+  background: rgba(10, 20, 28, 0.62);
+  border-left: 4px solid #ffd23f;
+  border-radius: 4px;
+  padding: 10px 14px;
+}
+
+#hud-mission-title {
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #ffd23f;
+}
+
+#hud-objective { font-size: 16px; margin-top: 3px; line-height: 1.3; }
+
+#hud-distance {
+  font-size: 13px;
+  color: #bfe3f2;
+  margin-top: 2px;
+}
+
+#hud-bottom-left {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+}
+
+#hud-health {
+  width: 170px;
+  height: 12px;
+  background: rgba(10, 20, 28, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+#hud-health-fill {
+  height: 100%;
+  width: 100%;
+  background: #37d67a;
+  transition: width 0.2s;
+}
+
+#hud-health-fill.low { background: #ff5147; }
+
+#hud-minimap {
+  display: block;
+  width: 170px;
+  height: 170px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+#hud-bottom-right {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  text-align: right;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+#hud-speed { font-size: 34px; font-weight: bold; }
+
+#hud-ammo { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+
+#hud-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+#hud-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 15%;
+  transform: translateX(-50%);
+  background: rgba(10, 20, 28, 0.7);
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 16px;
+}
+
+#hud-prompt:empty { display: none; }
+
+#hud-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  transform: translateX(-50%);
+  background: rgba(10, 20, 28, 0.55);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #d8ecf3;
+  white-space: nowrap;
+}
+
+#hud-subtitles {
+  position: absolute;
+  left: 50%;
+  bottom: 24%;
+  transform: translateX(-50%);
+  max-width: 640px;
+  text-align: center;
+  font-size: 19px;
+  line-height: 1.35;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+#hud-subtitle-who {
+  color: #ffd23f;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+#hud-banner {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  text-align: center;
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.8);
+  animation: banner-in 0.35s ease-out;
+}
+
+@keyframes banner-in {
+  from { opacity: 0; transform: translateX(-50%) scale(0.92); }
+  to { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
+#hud-banner-title {
+  font-family: "Arial Black", Arial, sans-serif;
+  font-size: 44px;
+  letter-spacing: 2px;
+  color: #ffd23f;
+}
+
+#hud-banner-sub { font-size: 19px; margin-top: 4px; }
+
+#hud-toast {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translateX(-50%);
+  background: rgba(10, 20, 28, 0.75);
+  border-radius: 4px;
+  padding: 8px 18px;
+  font-size: 17px;
+}
+
+#hud-damage {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 0, 0, 0.55) 100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------- Overlays ---------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 18, 26, 0.62);
+  z-index: 20;
+  overflow-y: auto;
+}
+
+.overlay-panel {
+  max-width: 620px;
+  width: 92%;
+  text-align: center;
+  background: rgba(10, 22, 30, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  padding: 32px 36px;
+  margin: 20px 0;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.game-kicker {
+  font-size: 13px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #7cc3e8;
+}
+
+.game-title {
+  font-family: "Arial Black", Arial, sans-serif;
+  font-size: 72px;
+  line-height: 1;
+  margin: 8px 0 0;
+  letter-spacing: 6px;
+  color: #ffd23f;
+  text-shadow: 0 4px 0 #b8860b, 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.game-subtitle {
+  font-size: 22px;
+  letter-spacing: 3px;
+  color: #fff;
+  margin-top: 2px;
+}
+
+.game-blurb {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #d8ecf3;
+  margin: 16px 0;
+}
+
+.overlay-title {
+  font-family: "Arial Black", Arial, sans-serif;
+  font-size: 52px;
+  margin: 0 0 8px;
+  letter-spacing: 3px;
+}
+
+.overlay-blue { color: #6aa9ff; }
+.overlay-red { color: #ff5147; }
+.overlay-gold { color: #ffd23f; }
+
+.button-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+
+.btn {
+  pointer-events: auto;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 17px;
+  font-weight: bold;
+  border-radius: 6px;
+  padding: 12px 26px;
+}
+
+.btn:hover { background: rgba(255, 255, 255, 0.22); }
+
+.btn-primary {
+  background: #ffd23f;
+  border-color: #ffd23f;
+  color: #1a1a1a;
+}
+
+.btn-primary:hover { background: #ffdd6e; }
+
+.btn-danger { background: rgba(255, 81, 71, 0.25); border-color: #ff5147; }
+
+#start-save-info { font-size: 14px; color: #bfe3f2; min-height: 18px; }
+
+.controls-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 24px;
+  text-align: left;
+  font-size: 14px;
+  color: #d8ecf3;
+  margin: 18px auto 0;
+  max-width: 420px;
+}
+
+.controls-grid b { color: #ffd23f; }
+
+.game-footnote {
+  font-size: 13px;
+  color: #8fb6c9;
+  margin: 18px 0 0;
+  line-height: 1.45;
+}
